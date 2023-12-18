@@ -1,0 +1,7 @@
+{
+    "name": "jscommand",
+    "creator": "Ekstra",
+    "description": "This module adds the /js command which allows to write javascript code directly to chat.",
+    "entry": "index.js",
+    "version": "1.0.0"
+}
