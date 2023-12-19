@@ -15,12 +15,43 @@ const e = Math.E,
 	pow = (x,y) => Math.pow(x,y),
 	mod = (x,y) => x%y;
 
-const prefix = "/js ";
+const PREFIX = "/js ";
 
-let formatNumbers = true,
-	liveEval = true;
+function formatTypeToString(value) {
+	try {
+		let output;
+		if (typeof value === "undefined") {
+			output = "§8§oundefined";
+		}
+		else if (typeof value === "function") {
+			output = value.toString();
+			output = output.trim(); // for some reason, <arrow function>.toString() has a new line char at the start and at the end.
+		}
+		else if (typeof value === "number") {
+			output = `§f${formatNumber(value)}`;
+		}
+		else if (typeof value !== "string") {
+			output = "§e§l" + JSON.stringify(value, undefined, 2);
+
+			// if has new lines, then recolor each line separately
+			if (output.includes("\n")) {
+				output = output.replace(/\n/g,`\n`);
+				const lastNewLine = output.lastIndexOf("\n");
+				output = output.slice(0,lastNewLine) + "\n§e§l" + output.slice(lastNewLine+1);
+			}
+		}
+		else output = value;
+
+		return output
+	}
+	catch (e) {
+		return "§c§oCouldn't format!";
+	}
+}
+
+let pretty_numbers = false;
 function formatNumber(x) {
-	if (!formatNumbers) return x;
+	if (!pretty_numbers) return x;
 
 	const sign = Math.sign(x),
 		  t = Math.abs(x);
@@ -40,68 +71,14 @@ function formatNumber(x) {
 	return `${sign===-1?"-":""}${o}`
 }
 
-let prevMsg = "",
-	prevLiveMsg = "";
-
-function format(value) {
-	try {
-		let output;
-		if (typeof value === "undefined") {
-			output = "§8§oundefined";
-		}
-		else if (typeof value === "function") {
-			output = value.toString();
-			output = output.trim(); // for some reason, Function.toString() has a new line char at the start and at the end.
-		}
-		else if (typeof value === "number") {
-			output = `§f${formatNumber(value)}`;
-		}
-		else if (typeof value !== "string") {
-			output = "§e§l" + JSON.stringify(value, undefined, 2);
-			// if has new lines, then recolor each line separately
-			if (output.includes("\n")) {
-				output = output.replace(/\n/g,`\n`);
-				const lastNewLine = output.lastIndexOf("\n");
-				output = output.slice(0,lastNewLine) + "\n§e§l" + output.slice(lastNewLine+1);
-			}
-		}
-		else output = value;
-
-		return output
-	}
-	catch (e) {
-		return "§c§oCouldn't format!";
-	}
-}
-
 function formatGlobalVar(variable) {
-	return `§6§l${variable} §r§8= §r§o${format(this[variable])}§r§7;`;
+	return `§6§l${variable} §r§8= §r§o${formatTypeToString(this[variable])}§r§7;`;
 }
 
-register('tick', () => {
-	if (liveEval === true && Client.isInChat()) {
-		const msg = Client.getCurrentChatMessage();
-
-		// don't recalculate if it didn't change
-		if (msg === prevMsg)
-			return;
-
-		prevMsg = msg;
-
-		if (msg.slice(0,prefix.length) === prefix) {
-
-			const input = msg.slice(prefix.length),
-				  output = evalJS(input);
-
-			if (output) {
-				const message = new Message(formatOutputForChat(input,output));
-				message.setChatLineId(94358);
-				ChatLib.chat(message);
-				prevLiveMsg = message;
-			}
-		}
-	}
-});
+function formatOutputForChat(input, output) {
+	const bar = `§0§l§o${ChatLib.getChatBreak("─")}`;
+	return `${bar}\n§b§lInput\n\n${input}\n${bar}\n§9§lOutput\n\n${output}\n${bar}\n`;
+}
 
 function evalJS(toEval) {
 	if (toEval === "") return;
@@ -112,7 +89,7 @@ function evalJS(toEval) {
 
 		// this is the global container of all the declared variables
 		if (toEval === "this") {
-			const varsToOmit = ["require","exports","module","prevMsg","prefix","format","formatNumber","evalJS","formatOutputForChat","prevLiveMsg","prevOutputs","printAndSaveMessage","formatGlobalVar"]; // List of all the variable names that should be hidden
+			const varsToOmit = ["require","exports","module","prevInput","PREFIX","formatTypeToString","formatNumber","evalJS","formatOutputForChat","prevLiveMsg","commandMessage","liveMessage","formatGlobalVar"]; // List of all the variable names that should be hidden when calling the command /js this
 			evaluated = ["§d§lLocal variables\n"];
 
 			for (let i=0; i<vars.length; i++) {
@@ -141,50 +118,78 @@ function evalJS(toEval) {
 		evaluated = `§c§o${e.toString()}`;
 	}
 
-	return format(evaluated);
+	return formatTypeToString(evaluated);
 }
 
-function formatOutputForChat(input, output) {
-	const bar = `§0§l§o${ChatLib.getChatBreak("─")}`;
-	return `${bar}\n§b§lInput\n\n${input}\n${bar}\n§9§lOutput\n\n${output}\n${bar}\n`;
+function liveMessage(text) {
+	const msg = new Message(text);
+	msg.setChatLineId(94358);
+	ChatLib.chat(msg);
+	prevLiveMsg = text;
 }
 
-function printAndSaveMessage(text) {
-	const message = new Message(text);
-	ChatLib.chat(message);
-	prevOutputs.push(message);
+let live_js = true,
+	prevInput = "",
+	prevLiveMsg = "";
+register('tick', () => {
+	if (live_js === true && Client.isInChat()) {
+		const msg = Client.getCurrentChatMessage();
+
+		// evaluate only once in a row each user input.
+		if (msg === prevInput)
+			return;
+
+		prevInput = msg;
+
+		if (msg.slice(0,PREFIX.length) === PREFIX) { // does the command start with "/js "?
+
+			const input = msg.slice(PREFIX.length),
+				  output = evalJS(input);
+
+			if (output) {
+				const text = formatOutputForChat(input,output);
+				liveMessage(text);
+			}
+		}
+	}
+});
+
+function commandMessage(text) {
+	const msg = new Message(text);
+	msg.setChatLineId(94360);
+	ChatLib.chat(msg);
 }
 
-let prevOutputs = [];
 register('command', (...strings) => {
 	let input = strings.join(" ");
 	if (!input || input === "") {
-		printAndSaveMessage("§cNo input provided.");
+		commandMessage("§cNo input provided.");
 	}
 	else if (input === "help") {
 		const bar = `§b§l§o${ChatLib.getChatBreak("─")}`;
-		printAndSaveMessage(`${bar}\n§a/js <javascript> §7- §owhile typing out the code its real-time evaluation will be shown in the chat; can also be used as a command.\n§a/js clear §7- §oclears the chat from all the outputs of the /js command.\n§a/js this §7- §olists all the global variables.\n§a/js formatNumbers <true|false> §7- §owhen true, all numbers that are shown in chat will be written in shorthand.\n§a/js liveEval <true|false> §7- §owhen true, auto-evaluate javascript in real-time while typing the /js command.\n${bar}`);
+		commandMessage(`${bar}\n§a/js <javascript> §7- §owhile typing out the code its real-time evaluation will be shown in the chat; can also be used as a command.\n§a/js clear §7- §oclears the chat from all the outputs of the /js command.\n§a/js this §7- §olists all the global variables.\n§a/js pretty_numbers <true|false> §7- §owhen true, all numbers that are shown in chat will be written in shorthand.\n§a/js live_js <true|false> §7- §owhen true, auto-evaluate javascript in real-time while typing the /js command.\n${bar}`);
 	}
 	else if (input === "clear") {
-		for (let i=0; i<prevOutputs.length; i++) {
-			prevOutputs[i].edit(new Message(""));
-			ChatLib.deleteChat(prevOutputs[i]);
-		}
-
-		prevOutputs = [];
-
+		ChatLib.deleteChat(94358); // live messages
+		ChatLib.deleteChat(94360); // command messages
+		commandMessage("§8The chat was succesfully cleared.");
+	}
+	/* 
+		Prevent the code from being executed two times in a row, especially for functions like
+			myArray.push(...)
+	*/
+	else if (live_js === true && prevLiveMsg !== "") {
 		ChatLib.deleteChat(94358);
-
-		printAndSaveMessage("§8The chat was succesfully cleared.");
+		commandMessage(prevLiveMsg);
+		prevLiveMsg = "";
+		return;
 	}
 	else {
 		const output = evalJS(input);
 
 		if (output) {
-			// clear live output from chat
-			ChatLib.deleteChat(94358);
-
-			printAndSaveMessage(formatOutputForChat(input,output))
+			const text = formatOutputForChat(input,output);
+			commandMessage(text)
 		}
 	}
-}).setName(prefix.slice(1,-1));
+}).setName(PREFIX.slice(1,-1)); // "js"
