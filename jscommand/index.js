@@ -40,7 +40,10 @@ function formatTypeToString(value) {
 				output = output.slice(0,lastNewLine) + "\n§e§l" + output.slice(lastNewLine+1);
 			}
 		}
-		else output = value;
+		else if (value.slice(0,8) === "https://") {
+			output = value;
+		}
+		else output = `§e"§r§o${value}§r§e"§r`;
 
 		return output
 	}
@@ -49,9 +52,9 @@ function formatTypeToString(value) {
 	}
 }
 
-let pretty_numbers = false;
+let prettyprint = false;
 function formatNumber(x) {
-	if (!pretty_numbers) return x;
+	if (!prettyprint) return x;
 
 	const sign = Math.sign(x),
 		  t = Math.abs(x);
@@ -81,13 +84,17 @@ function formatOutputForChat(input, output) {
 }
 
 function evalJS(toEval) {
-	if (toEval === "") return;
+	if (!toEval || toEval === "") return "§cNo input provided.";
+	toEval = toEval.trim();
 
 	let evaluated;
 	try {
 		const vars = Object.keys(this); // get all local variable names
 
 		// this is the global container of all the declared variables
+		if (toEval === "t" || toEval === "th" || toEval === "thi") {
+			return "§6§lthis§r §8- §7§olists all the global variables.";
+		}
 		if (toEval === "this") {
 			const varsToOmit = ["require","exports","module","prevInput","PREFIX","formatTypeToString","formatNumber","evalJS","formatOutputForChat","prevLiveMsg","commandMessage","liveMessage","formatGlobalVar"]; // List of all the variable names that should be hidden when calling the command /js this
 			evaluated = ["§d§lLocal variables\n"];
@@ -99,10 +106,40 @@ function evalJS(toEval) {
 				}
 			}
 
-			evaluated = evaluated.join("\n")
+			return evaluated.join("\n")
+		}
+		else if (toEval === "h" || toEval === "he" || toEval === "hel") {
+			return "§6§lhelp§r §8- §7§odisplays useful info.";
+		}
+		else if (toEval === "help") {
+			const bar = `§b§l§o${ChatLib.getChatBreak("─")}`;
+			return `${bar}\n§a/js <javascript> §7- §owhile typing out the code its real-time evaluation will be shown in the chat; can also be used as a command.\n§a/js clear §7- §oclears the chat from all the outputs of the /js command.\n§a/js this §7- §olists all the global variables.\n§a/js prettyprint <true|false> §7- §owhen true, all numbers that are shown in chat will be written in shorthand.\n§a/js livejs <true|false> §7- §owhen true, auto-evaluate javascript in real-time while typing the /js command.\n§a/js wiki <query>§r §7- §osends the link to the specified query.\n§a/js help §7- §odisplays this message.\n${bar}`;
+		}
+		else if (toEval.slice(0,11) === "prettyprint" && (toEval.slice(12).trim() === "true" || toEval.slice(12).trim() === "false")) {
+			prettyprint = Boolean(toEval.slice(12).trim() === "true");
+			return formatGlobalVar("prettyprint");
+		}
+		else if (toEval === "p" || toEval === "pr" || toEval === "pre" || toEval === "pret" || toEval === "prett" || toEval === "pretty" || toEval === "prettyp" || toEval === "prettypr" || toEval === "prettypri" || toEval === "prettyprin" || toEval.slice(0,11) === "prettyprint" && toEval.length > 11) {
+			return "§6§lprettyprint§r §e§o<true|false>§r §8- §7§owhen true, all numbers that are shown in chat will be written in shorthand.";
+		}
+		else if (toEval.slice(0,6) === "livejs" && (toEval.slice(7).trim() === "true" || toEval.slice(7).trim() === "false")) {
+			livejs = Boolean(toEval.slice(7).trim() === "true");
+			return formatGlobalVar("livejs");
+		}
+		else if (toEval === "l" || toEval === "li" || toEval === "liv" || toEval === "live" || toEval === "livej" || toEval.slice(0,6) === "livejs" && toEval.length > 6) {
+			return "§6§llivejs§r §e§o<true|false>§r §8- §7§owhen true, auto-evaluate javascript in real-time while typing the /js command.";
+		}
+		else if (toEval === "c" || toEval === "cl" || toEval === "cle" || toEval === "clea" || toEval === "clear") {
+			return "§6§lclear§r §8- §7§oclears the chat from all the outputs of the /js command.";
+		}
+		else if (toEval === "w" || toEval === "wi" || toEval === "wik" || toEval === "wiki" || toEval ==="wiki ") {
+			return "§6§lwiki§r §e§o<query>§r §8- §7§osends the link to the specified query.";
+		}
+		else if (toEval.slice(0,4) === "wiki") { 
+			evaluated = `https://wiki.hypixel.net/index.php?search=${toEval.slice(5).trim().replaceAll(" ","+")}&title=Special%3ASearch`
 		}
 		else if (vars.includes(toEval)) {
-			evaluated = formatGlobalVar(toEval);
+			return formatGlobalVar(toEval);
 		}
 		else 
 			/* binding this helps with function declarations: now 
@@ -128,11 +165,11 @@ function liveMessage(text) {
 	prevLiveMsg = text;
 }
 
-let live_js = true,
+let livejs = true,
 	prevInput = "",
 	prevLiveMsg = "";
 register('tick', () => {
-	if (live_js === true && Client.isInChat()) {
+	if (livejs === true && Client.isInChat()) {
 		const msg = Client.getCurrentChatMessage();
 
 		// evaluate only once in a row each user input.
@@ -143,7 +180,7 @@ register('tick', () => {
 
 		if (msg.slice(0,PREFIX.length) === PREFIX) { // does the command start with "/js "?
 
-			const input = msg.slice(PREFIX.length),
+			const input = msg.slice(PREFIX.length).trim(),
 				  output = evalJS(input);
 
 			if (output) {
@@ -154,35 +191,27 @@ register('tick', () => {
 	}
 });
 
-function commandMessage(text) {
+function commandMessage(text) { 
 	const msg = new Message(text);
 	msg.setChatLineId(94360);
 	ChatLib.chat(msg);
 }
 
 register('command', (...strings) => {
-	let input = strings.join(" ");
-	if (!input || input === "") {
-		commandMessage("§cNo input provided.");
-	}
-	else if (input === "help") {
-		const bar = `§b§l§o${ChatLib.getChatBreak("─")}`;
-		commandMessage(`${bar}\n§a/js <javascript> §7- §owhile typing out the code its real-time evaluation will be shown in the chat; can also be used as a command.\n§a/js clear §7- §oclears the chat from all the outputs of the /js command.\n§a/js this §7- §olists all the global variables.\n§a/js pretty_numbers <true|false> §7- §owhen true, all numbers that are shown in chat will be written in shorthand.\n§a/js live_js <true|false> §7- §owhen true, auto-evaluate javascript in real-time while typing the /js command.\n${bar}`);
-	}
-	else if (input === "clear") {
-		ChatLib.deleteChat(94358); // live messages
-		ChatLib.deleteChat(94360); // command messages
-		commandMessage("§8The chat was succesfully cleared.");
-	}
+	const input = strings.join(" ").trim();
 	/* 
 		Prevent the code from being executed two times in a row, especially for functions like
 			myArray.push(...)
 	*/
-	else if (live_js === true && prevLiveMsg !== "") {
+	if (input === "clear") {
+		ChatLib.deleteChat(94358); // live messages
+		ChatLib.deleteChat(94360); // command messages
+		commandMessage("§8The chat was succesfully cleared.");
+	}
+	else if (livejs === true && prevLiveMsg !== "") {
 		ChatLib.deleteChat(94358);
 		commandMessage(prevLiveMsg);
 		prevLiveMsg = "";
-		return;
 	}
 	else {
 		const output = evalJS(input);
@@ -193,3 +222,10 @@ register('command', (...strings) => {
 		}
 	}
 }).setName(PREFIX.slice(1,-1)); // "js"
+
+/* 
+	TODO add listener for chat that matches only certain
+	templates and can then extrapolate data from these templates.
+
+	for example: each time that the message "You received X of something" can be matched and X is a number that can be accumulated into a variable.
+*/
