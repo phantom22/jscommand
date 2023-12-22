@@ -6,6 +6,6 @@ doing quick math calculations while storing the data in volatile variables that 
 
 ### Ease of use
 While typing the javascript code there is a preview of the output to chat with a nicely formatted box. 
-The output of the numbers can be formatted in a Hypixel Skyblock fashion when needed.
+The output numbers can be formatted in a Hypixel Skyblock fashion when needed.
 
 The **/js help** lists how to customize some features.
