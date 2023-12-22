@@ -1,38 +1,3 @@
-// 
-// else if (["p","pr","pre","pret","prett","pretty","prettyp","prettypr","prettypri","prettyprin"].includes(toEval) || toEval.slice(0,11) === "prettyprint") {
-// 	const value = toEval.slice(12).trim();
-// 	if (["true","false"].includes(value)) {
-// 		prettyprint = value === "true";
-// 		return formatGlobalVar("prettyprint");
-// 	}
-// 	else if (toEval.length === 11) {
-// 		return formatGlobalVar("prettyprint")
-// 	}
-// 	else {
-// 		return "§6§lprettyprint§r §e§o<true|false>§r §8- §7§owhen true, all numbers that are shown in chat will be written in shorthand.";
-// 	}
-// 
-// lse if (["l","li","liv","live","livej"].includes(toEval) || toEval.slice(0,6) === "livejs") {
-// 	const value = toEval.slice(7).trim();
-// 	if (["true","false"].includes(value)) {
-// 		livejs = value === "true";
-// 		return formatGlobalVar("livejs");
-// 	}
-// 	else if (toEval.length === 6) {
-// 		return formatGlobalVar("livejs")
-// 	}
-// 	else {
-// 		return "§6§llivejs§r §e§o<true|false>§r §8- §7§owhen true, auto-evaluate javascript in real-time while typing the /js command.";
-// 	}
-// 
-
-/* 
-	TODO add listener for chat that matches only certain
-	templates and can then extrapolate data from these templates.
-
-	for example: each time that the message "You received X of something" can be matched and X is a number that can be accumulated into a variable.
-*/
-
 const e = Math.E,
 	pi = Math.PI,
 	sqrt = x => Math.sqrt(x),
@@ -192,7 +157,6 @@ function analyzeInput(input, fromLive) {
 
 function evalJS(toEval, fromLive) {
 
-	//if (Array.isArray(toEval)) toEval = toEval.filter(v => v !== "");
 	const i = analyzeInput(toEval, fromLive),
 		  vars = Object.keys(this);
 
@@ -324,15 +288,15 @@ function commandMessage(text) {
 }
 
 register("command", (...input) => {
-	/* 
-		Prevent the code from being executed two times in a row, especially for functions like
-			myArray.push(...)
-	*/
 	if (input[0] === "clear") {
 		ChatLib.deleteChat(94358); // live messages
 		ChatLib.deleteChat(94360); // command messages
 		commandMessage("§8The chat was succesfully cleared.");
 	}
+	/* 
+		Prevent the code from being executed two times in a row, especially for functions like
+			myArray.push(...)
+	*/
 	else if (livejs === true && prevLiveMsg !== "") {
 		ChatLib.deleteChat(94358);
 		commandMessage(prevLiveMsg);
@@ -347,11 +311,4 @@ register("command", (...input) => {
 			commandMessage(text)
 		}
 	}
-}).setName("js"); // "js"
-
-/* 
-	TODO add listener for chat that matches only certain
-	templates and can then extrapolate data from these templates.
-
-	for example: each time that the message "You received X of something" can be matched and X is a number that can be accumulated into a variable.
-*/
+}).setName("js");
