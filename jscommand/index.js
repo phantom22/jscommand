@@ -32,13 +32,18 @@ function formatTypeToString(value) {
 			output = formatBool(value);
 		}
 		else if (typeof value !== "string") {
-			output = "§e§l" + JSON.stringify(value, undefined, 2);
+			try {
+				output = "§e§l" + JSON.stringify(value, undefined, 2);
 
-			// if has new lines, then recolor each line separately
-			if (output.includes("\n")) {
-				output = output.replace(/\n/g,`\n`);
-				const lastNewLine = output.lastIndexOf("\n");
-				output = output.slice(0,lastNewLine) + "\n§e§l" + output.slice(lastNewLine+1);
+				// if has new lines, then recolor each line separately
+				if (output.includes("\n")) {
+					output = output.replace(/\n/g,`\n`);
+					const lastNewLine = output.lastIndexOf("\n");
+					output = output.slice(0,lastNewLine) + "\n§e§l" + output.slice(lastNewLine+1);
+				}
+			}
+			catch (e) {
+				output = value.toString();
 			}
 		}
 		else if (value.slice(0,8) === "https://") {
@@ -49,7 +54,7 @@ function formatTypeToString(value) {
 		return output
 	}
 	catch (e) {
-		return "§c§oCouldn't format!";
+		return "§c§ocouldn't print output.";
 	}
 }
 
@@ -157,88 +162,102 @@ function analyzeInput(input, fromLive) {
 
 function evalJS(toEval, fromLive) {
 
-	const i = analyzeInput(toEval, fromLive),
-		  vars = Object.keys(this);
+	try {
 
-	let evaluated;
-	switch (i) {
-		case 0:
-			return "§cNo input provided."
-		case -1:
-			try {
-				const input = toEval.join(" ");
-				if (vars.includes(input)) {
-					return formatGlobalVar(input);
-				}
-				else if (!fromLive || fromLive && !/\+=|-=|\*=|\/=|%=|\*\*=|<<=|>>=|>>>=|&=|\^=|\|=|&&=|\|\|=|\?\?=/.test(input)) 
-					/* binding this helps with function declarations: now 
-					   function name () {
-						  ...
-					   }
-					   actually stores the function into this[name]
-				   
-					*/
-					evaluated = eval.call(this,input);
-				else {
-					toEvalOnCommand = true;
-					return "§lhit enter to evaluate the input because it contains shorthand assignments that can cause unwanted results."
-				}
-			}
-			catch (e) {
-				evaluated = `§c§o${e.toString()}`;
-			}
-			break;
-		case 1:
-			toEvalOnCommand = true;
-			return `${safePredict(toEval[0],"this")}§r §8- §7§olists all the global variables.`;
-		case 2:
-			const varsToOmit = ["require","exports","module","prevInput","formatTypeToString","formatNumber","formatBool","evalJS","formatOutputForChat","prevLiveMsg","commandMessage","liveMessage","formatGlobalVar","analyzeInput","safePredict","unsafePredictBool","toEvalOnCommand","omitFormatToChat"]; // List of all the variable names that should be hidden when calling the command /js this
-			evaluated = ["§d§lLocal variables\n"];
+		// clear all unnecessary whitespace
+		toEval = toEval.filter(v => v !== "");
 
-			for (let i=0; i<vars.length; i++) {
-				const variable = vars[i];
-				if (!varsToOmit.includes(variable)) {
-					evaluated.push(formatGlobalVar(variable));
-				}
-			}
+		const i = analyzeInput(toEval, fromLive),
+			vars = Object.keys(this);
 
-			return evaluated.join("\n");
-		case 3:
-			toEvalOnCommand = true;
-			return `${safePredict(toEval[0],"help")}§r §8- §7§odisplays useful info.`;
-		case 4:
-			const bar = `§b§l§o${ChatLib.getChatBreak("─")}`;
-			omitFormatToChat = true;
-			return `${bar}\n§a/js <javascript> §7- §owhile typing out the code its real-time evaluation will be shown in the chat; can also be used as a command.\n§a/js clear §7- §oclears the chat from all the outputs of the /js command.\n§a/js this §7- §olists all the global variables.\n§a/js prettyprint <true|false> §7- §owhen true, all numbers that are shown in chat will be written in shorthand.\n§a/js livejs <true|false> §7- §owhen true, auto-evaluate javascript in real-time while typing the /js command.\n§a/js wiki <query>§r §7- §osends the link to the specified query.\n§a/js help §7- §odisplays this message.\n${bar}`;
-		case 5:
-			return `${safePredict(toEval[0],"prettyprint")}§r ${formatBool(prettyprint)}§r §8- §7§owhen true, all numbers that are shown in chat will be written in shorthand.`;
-		case 6:
-			prettyprint = toEval[1] === "true";
-			return `${safePredict(toEval[0],"prettyprint")}§r ${formatBool(prettyprint)}§r §8- §7§owhen true, all numbers that are shown in chat will be written in shorthand.`;
-		case 7:
-			toEvalOnCommand = true;
-			return `${safePredict(toEval[0],"prettyprint")}§r ${unsafePredictBool(toEval[1])}§r §8- §7§owhen true, all numbers that are shown in chat will be written in shorthand.`
-		case 8:
-			return `${safePredict(toEval[0],"livejs")}§r ${formatBool(livejs)}§r §8- §7§owhen true, auto-evaluate javascript in real-time while typing the /js command.`;
-		case 9:
-			livejs = toEval[1] === "true";
-			return `${safePredict(toEval[0],"livejs")}§r ${formatBool(livejs)}§r §8- §7§owhen true, auto-evaluate javascript in real-time while typing the /js command.`;
-		case 10:
-			toEvalOnCommand = true;
-			return `${safePredict(toEval[0],"livejs")}§r ${unsafePredictBool(toEval[1])}§r §8- §7§owhen true, auto-evaluate javascript in real-time while typing the /js command.`;
-		case 11:
-			return `${safePredict(toEval[0],"clear")}§r §8- §7§oclears the chat from all the outputs of the /js command.`;
-		case 12:
-			return `${safePredict(toEval[0],"wiki")}§r §a§o<query>§r §8- §7§osends the link to the specified query.`;
-		case 13:
-			return `https://wiki.hypixel.net/index.php?search=${toEval[1].replaceAll(" ","+")}&title=Special%3ASearch`;
-		case 14:
-			toEvalOnCommand = true;
-			return "";
+		let evaluated;
+		switch (i) {
+			case 0:
+				return "§cno input provided."
+			case -1:
+				try {
+					const input = toEval.join(" ");
+					if (vars.includes(input)) {
+						return formatGlobalVar(input);
+					}
+					else if (/^\s*(com|Client|GuiHandler|NBT)|(\=|;|,|\(|\[|{|\+|-|\*|\/|%|<|>|&|\^|\||\?)\s*(com|Client|GuiHandler|NBT)/.test(input)) {
+						return "§cinvalid input.";
+					}
+					else if (!fromLive || fromLive && !/\+=|-=|\*=|\/=|%=|\*\*=|<<=|>>=|>>>=|&=|\^=|\|=|&&=|\|\|=|\?\?=/.test(input)) 
+						/* binding this helps with function declarations: now 
+						function name () {
+							...
+						}
+						actually stores the function into this[name]
+					
+						*/
+						evaluated = eval.call(this,input);
+					else {
+						toEvalOnCommand = true;
+						return "§lhit enter to evaluate the input because it contains shorthand assignments that can cause unwanted results."
+					}
+				}
+				catch (e) {
+					evaluated = `§c§o${e.toString()}`;
+				}
+				break;
+			case 1:
+				toEvalOnCommand = true;
+				return `${safePredict(toEval[0],"this")}§r §8- §7§olists all the global variables.`;
+			case 2:
+				const varsToOmit = ["require","exports","module","prevInput","formatTypeToString","formatNumber","formatBool","evalJS","formatOutputForChat","prevLiveMsg","commandMessage","liveMessage","formatGlobalVar","analyzeInput","safePredict","unsafePredictBool","toEvalOnCommand","omitFormatToChat"]; // List of all the variable names that should be hidden when calling the command /js this
+				evaluated = ["§d§llocal variables\n"];
+
+				for (let i=0; i<vars.length; i++) {
+					const variable = vars[i];
+					if (!varsToOmit.includes(variable)) {
+						evaluated.push(formatGlobalVar(variable));
+					}
+				}
+
+				return evaluated.join("\n");
+			case 3:
+				toEvalOnCommand = true;
+				return `${safePredict(toEval[0],"help")}§r §8- §7§odisplays useful info.`;
+			case 4:
+				const bar = `§b§l§o${ChatLib.getChatBreak("─")}`;
+				omitFormatToChat = true;
+				return `${bar}\n§a/js <javascript> §7- §owhile typing out the code its real-time evaluation will be shown in the chat; can also be used as a command.\n§a/js clear §7- §oclears the chat from all the outputs of the /js command.\n§a/js this §7- §olists all the global variables.\n§a/js prettyprint <true|false> §7- §owhen true, all numbers that are shown in chat will be written in shorthand.\n§a/js livejs <true|false> §7- §owhen true, auto-evaluate javascript in real-time while typing the /js command.\n§a/js wiki <query>§r §7- §osends the link to the specified query.\n§a/js help §7- §odisplays this message.\n${bar}`;
+			case 5:
+				return `${safePredict(toEval[0],"prettyprint")}§r ${formatBool(prettyprint)}§r §8- §7§owhen true, all numbers that are shown in chat will be written in shorthand.`;
+			case 6:
+				prettyprint = toEval[1] === "true";
+				return `${safePredict(toEval[0],"prettyprint")}§r ${formatBool(prettyprint)}§r §8- §7§owhen true, all numbers that are shown in chat will be written in shorthand.`;
+			case 7:
+				toEvalOnCommand = true;
+				return `${safePredict(toEval[0],"prettyprint")}§r ${unsafePredictBool(toEval[1])}§r §8- §7§owhen true, all numbers that are shown in chat will be written in shorthand.`
+			case 8:
+				return `${safePredict(toEval[0],"livejs")}§r ${formatBool(livejs)}§r §8- §7§owhen true, auto-evaluate javascript in real-time while typing the /js command.`;
+			case 9:
+				livejs = toEval[1] === "true";
+				return `${safePredict(toEval[0],"livejs")}§r ${formatBool(livejs)}§r §8- §7§owhen true, auto-evaluate javascript in real-time while typing the /js command.`;
+			case 10:
+				toEvalOnCommand = true;
+				return `${safePredict(toEval[0],"livejs")}§r ${unsafePredictBool(toEval[1])}§r §8- §7§owhen true, auto-evaluate javascript in real-time while typing the /js command.`;
+			case 11:
+				return `${safePredict(toEval[0],"clear")}§r §8- §7§oclears the chat from all the outputs of the /js command.`;
+			case 12:
+				return `${safePredict(toEval[0],"wiki")}§r §a§o<query>§r §8- §7§osends the link to the specified query.`;
+			case 13:
+				return `https://wiki.hypixel.net/index.php?search=${toEval[1].replaceAll(" ","+")}&title=Special%3ASearch`;
+			case 14:
+				toEvalOnCommand = true;
+				return "";
+
+		}
+
+		return formatTypeToString(evaluated);
 
 	}
+	catch (e) {
+		return "§ccouldn't evaluate input."
+	}
 
-	return formatTypeToString(evaluated);
 }
 
 function liveMessage(text) {
@@ -268,9 +287,9 @@ register("tick", () => {
 		prevInput = msg;
 
 		if (msg.slice(0,4) === "/js ") {
-
+			
 			const input = msg.slice(4).trim(),
-				  output = evalJS(input.split(" "), true);
+				  output = evalJS(input.split(" "), true)
 
 			if (output) {
 				const text = formatOutputForChat(input,output);
